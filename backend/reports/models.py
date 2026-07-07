@@ -5,6 +5,12 @@ from patients.models import Patient
 from drugs.models import Drug, DrugType
 from django.db import models
 
+# Generate current year
+from datetime import datetime
+
+# Database transaction support
+from django.db import transaction
+
 class ReportStatus(models.Model):
 
     status_name=models.CharField(max_length=50,unique=True)
@@ -40,8 +46,54 @@ class Outcome(models.Model):
 
 
 class Report(models.Model):
+        # Automatically generate registration number
+    def save(self, *args, **kwargs):
 
-    registration_number=models.CharField(max_length=30,unique=True)
+        # Generate registration number only for new reports
+        if not self.registration_number:
+
+            current_year = datetime.now().year
+
+            with transaction.atomic():
+
+                last_report = (
+                    Report.objects
+                    .select_for_update()
+                    .order_by("-id")
+                    .first()
+                )
+
+                if last_report:
+
+                    last_number = int(
+                        last_report.registration_number.split("-")[-1]
+                    ) + 1
+
+                else:
+
+                    last_number = 1
+
+                self.registration_number = (
+                    f"PV-{current_year}-{last_number:06d}"
+                )
+
+        super().save(*args, **kwargs)
+    
+
+    # Automatically assign Pending status for new reports
+    def save(self, *args, **kwargs):
+
+        if self._state.adding and not self.status_id:
+            self.status_id = 1
+
+        super().save(*args, **kwargs)
+    # Unique report registration number
+    registration_number = models.CharField(
+        max_length=30,
+        unique=True,
+        blank=True,
+        editable=False
+    )
 
     reporter=models.ForeignKey(Reporter,on_delete=models.PROTECT)
 
@@ -238,7 +290,7 @@ class Notification(models.Model):
     delivery_status=models.CharField(max_length=30)
 
     class Meta:
-        db_table="notifications"
+        db_table="notifications"                            
 
 
 class StatusHistory(models.Model):
