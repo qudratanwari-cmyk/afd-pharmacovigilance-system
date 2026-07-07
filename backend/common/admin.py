@@ -1,3 +1,9 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Province, Gender, Language, Setting
+
+
+admin.site.register(Province)
+admin.site.register(Gender)
+admin.site.register(Language)
+admin.site.register(Setting)

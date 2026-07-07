@@ -1,3 +1,7 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import ReporterType, HealthFacility, Reporter
+
+admin.site.register(ReporterType)
+admin.site.register(HealthFacility)
+admin.site.register(Reporter)
