@@ -1,6 +1,49 @@
 from django.contrib import admin
-from .models import *
 
-admin.site.register(Manufacturer)
-admin.site.register(DrugType)
-admin.site.register(Drug)
+from .models import Manufacturer, DrugType, Drug
+
+
+@admin.register(Manufacturer)
+class ManufacturerAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "manufacturer_name",
+        "country",
+    )
+
+    search_fields = (
+        "manufacturer_name",
+    )
+
+
+@admin.register(DrugType)
+class DrugTypeAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "drug_type_name",
+    )
+
+    search_fields = (
+        "drug_type_name",
+    )
+
+
+@admin.register(Drug)
+class DrugAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "generic_name",
+        "brand_name",
+        "strength",
+        "manufacturer",
+    )
+
+    list_filter = (
+        "manufacturer",
+    )
+
+    search_fields = (
+        "generic_name",
+        "brand_name",
+        "batch_number",
+    )

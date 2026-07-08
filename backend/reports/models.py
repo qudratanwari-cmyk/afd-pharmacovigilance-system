@@ -46,47 +46,7 @@ class Outcome(models.Model):
 
 
 class Report(models.Model):
-        # Automatically generate registration number
-    def save(self, *args, **kwargs):
-
-        # Generate registration number only for new reports
-        if not self.registration_number:
-
-            current_year = datetime.now().year
-
-            with transaction.atomic():
-
-                last_report = (
-                    Report.objects
-                    .select_for_update()
-                    .order_by("-id")
-                    .first()
-                )
-
-                if last_report:
-
-                    last_number = int(
-                        last_report.registration_number.split("-")[-1]
-                    ) + 1
-
-                else:
-
-                    last_number = 1
-
-                self.registration_number = (
-                    f"PV-{current_year}-{last_number:06d}"
-                )
-
-        super().save(*args, **kwargs)
     
-
-    # Automatically assign Pending status for new reports
-    def save(self, *args, **kwargs):
-
-        if self._state.adding and not self.status_id:
-            self.status_id = 1
-
-        super().save(*args, **kwargs)
     # Unique report registration number
     registration_number = models.CharField(
         max_length=30,
@@ -133,6 +93,39 @@ class Report(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
 
     updated_at=models.DateTimeField(auto_now=True)
+
+    # Automatically generate registration number and assign Pending status
+    def save(self, *args, **kwargs):
+
+        # Generate registration number only once
+        if not self.registration_number:
+
+            current_year = datetime.now().year
+
+            with transaction.atomic():
+
+                last_report = (
+                    Report.objects
+                    .select_for_update()
+                    .order_by("-id")
+                    .first()
+                )
+
+                if last_report and last_report.registration_number:
+
+                    last_number = int(
+                        last_report.registration_number.split("-")[-1]
+                    ) + 1
+
+                else:
+
+                    last_number = 1
+
+                self.registration_number = (
+                    f"PV-{current_year}-{last_number:06d}"
+                )
+
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table="reports"
