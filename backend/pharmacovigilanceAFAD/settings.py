@@ -84,9 +84,9 @@ WSGI_APPLICATION = 'pharmacovigilanceAFAD.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'pharmacovigilance_db',
+        'NAME': 'pharmacovigilanceDB',
         'USER': 'postgres',
-        'PASSWORD': 'admin@123',   # رمز خودت
+        'PASSWORD': '0744705670',   # رمز خودت
         'HOST': 'localhost',
         'PORT': '5432',
     }
