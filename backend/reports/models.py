@@ -349,6 +349,8 @@ class AuditLog(models.Model):
 
     action_date=models.DateTimeField(auto_now_add=True)
 
+    registration_number = models.CharField(max_length=50, null=True)
+
     ip_address=models.GenericIPAddressField()
 
     class Meta:

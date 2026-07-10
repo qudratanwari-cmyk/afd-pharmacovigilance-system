@@ -15,80 +15,75 @@ from .models import (
     StatusHistory,
 )
 
-# Inline Admin for Report Drugs
-# ==========================================
+
+# ==========================================================
+# Inline Admin Classes
+# ==========================================================
+
 class ReportDrugInline(admin.TabularInline):
-    """
-    Display report drugs inside Report admin page.
-    """
+    """Display report drugs inside report page."""
 
     model = ReportDrug
-
     extra = 1
 
 
-# ==========================================
-# Inline Admin for Adverse Reactions
-# ==========================================
 class AdverseReactionInline(admin.StackedInline):
-    """
-    Display adverse reactions inside Report admin page.
-    """
+    """Display adverse reactions inside report page."""
 
     model = AdverseReaction
-
     extra = 1
 
 
-# ==========================================
-# Inline Admin for Attachments
-# ==========================================
 class AttachmentInline(admin.TabularInline):
-    """
-    Display attachments inside Report admin page.
-    """
+    """Display attachments inside report page."""
 
     model = Attachment
-
     extra = 1
 
 
-
-
+# ==========================================================
+# Read Only Admin
+# ==========================================================
 
 class ReadOnlyAdmin(admin.ModelAdmin):
     """
-    Read-only admin for Reviewer users.
+    Reviewer can only view records.
     """
 
     def has_add_permission(self, request):
 
-        if request.user.role and request.user.role.role_name:
+        if request.user.is_reviewer:
             return False
 
         return super().has_add_permission(request)
 
+
     def has_change_permission(self, request, obj=None):
 
-        if request.user.role and request.user.role.role_name:
+        if request.user.is_reviewer:
             return False
 
         return super().has_change_permission(request, obj)
 
+
     def has_delete_permission(self, request, obj=None):
 
-        if request.user.role and request.user.role.role_name:
+        if request.user.is_reviewer:
             return False
 
         return super().has_delete_permission(request, obj)
 
+
+# ==========================================================
+# Report Admin
+# ==========================================================
+
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
     """
-    Django Admin configuration for Report model.
+    Admin configuration for Report model.
     """
 
-    # Display columns in report list
     list_display = (
         "registration_number",
         "reporter",
@@ -97,36 +92,38 @@ class ReportAdmin(admin.ModelAdmin):
         "report_date",
     )
 
-    # Search reports by registration number
     search_fields = (
         "registration_number",
     )
 
-    # Filter reports by status
     list_filter = (
         "status",
     )
 
-    # Read-only fields
     readonly_fields = (
         "registration_number",
     )
 
     ordering = (
-    "-created_at",
+        "-created_at",
     )
 
     list_per_page = 20
 
     date_hierarchy = "report_date"
 
-    # Organize report fields into logical sections
+    inlines = (
+        ReportDrugInline,
+        AdverseReactionInline,
+        AttachmentInline,
+    )
+
     fieldsets = (
 
         (
             "Report Information",
             {
-                "fields": (
+                "fields":(
                     "registration_number",
                     "report_date",
                     "status",
@@ -137,7 +134,7 @@ class ReportAdmin(admin.ModelAdmin):
         (
             "Reporter Information",
             {
-                "fields": (
+                "fields":(
                     "reporter",
                 )
             },
@@ -146,7 +143,7 @@ class ReportAdmin(admin.ModelAdmin):
         (
             "Patient Information",
             {
-                "fields": (
+                "fields":(
                     "patient",
                 )
             },
@@ -155,7 +152,7 @@ class ReportAdmin(admin.ModelAdmin):
         (
             "Review Information",
             {
-                "fields": (
+                "fields":(
                     "reviewed_by",
                     "approved_by",
                     "approved_date",
@@ -167,7 +164,7 @@ class ReportAdmin(admin.ModelAdmin):
         (
             "Remarks",
             {
-                "fields": (
+                "fields":(
                     "reject_reason",
                     "archive_reason",
                 )
@@ -175,175 +172,249 @@ class ReportAdmin(admin.ModelAdmin):
         ),
     )
 
-        # Display related models inside Report page
-    inlines = (
-        ReportDrugInline,
-        AdverseReactionInline,
-        AttachmentInline,
-    )
+        # ==========================================================
+    # Save Report
+    # ==========================================================
 
-    # Automatically save status history when status changes
     def save_model(self, request, obj, form, change):
+        """
+        Save report, create status history,
+        create audit log and assign reviewer.
+        """
 
+        previous_status = None
+
+        # Get previous status before saving
         if change:
 
-            previous = Report.objects.get(pk=obj.pk)
+            previous_status = (
+                Report.objects
+                .only("status")
+                .get(pk=obj.pk)
+                .status
+            )
 
-            if previous.status != obj.status:
+        # Automatically assign current admin
+        if not change and not obj.reviewed_by:
 
-                StatusHistory.objects.create(
+            obj.reviewed_by = request.user
 
-                    report=obj,
-
-                    old_status=previous.status,
-
-                    new_status=obj.status,
-
-                    changed_by=request.user,
-
-                )
-
+        # Save report
         super().save_model(request, obj, form, change)
-
-
-        # Save audit log after creating or updating a report
-    def save_model(self, request, obj, form, change):
 
         # Save status history
-        if change:
+        if change and previous_status != obj.status:
 
-            previous = Report.objects.get(pk=obj.pk)
+            StatusHistory.objects.create(
 
-            if previous.status != obj.status:
+                report=obj,
 
-                StatusHistory.objects.create(
+                old_status=previous_status,
 
-                    report=obj,
-                    old_status=previous.status,
-                    new_status=obj.status,
-                    changed_by=request.user,
-                )
+                new_status=obj.status,
 
-        super().save_model(request, obj, form, change)
+                changed_by=request.user,
+            )
+
+        
 
         # Save audit log
         AuditLog.objects.create(
 
             user=request.user,
 
-            action="Updated Report" if change else "Created Report",
+            action="UPDATE" if change else "CREATE",
 
-            table_name="reports",
+            table_name=obj._meta.db_table,
 
-            record_id=obj.id,
+            record_id=obj.pk,
+            registration_number=obj.registration_number,
 
             ip_address=request.META.get("REMOTE_ADDR"),
-        )  
-    # Save audit log when deleting a report
+        )
+
+
+    # ==========================================================
+    # Delete Report
+    # ==========================================================
+
     def delete_model(self, request, obj):
 
         AuditLog.objects.create(
 
             user=request.user,
 
-            action="Deleted Report",
+            action="DELETE",
 
-            table_name="reports",
+            table_name=obj._meta.db_table,
 
-            record_id=obj.id,
+            record_id=obj.pk,
 
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
-        super().delete_model(request, obj) 
+        super().delete_model(request, obj)
 
-    # Automatically assign current admin as reviewer
-    def save_model(self, request, obj, form, change):
 
-        # Assign reviewer only for new reports
-        if not change and not obj.reviewed_by:
-            obj.reviewed_by = request.user
+    # ==========================================================
+    # Permissions
+    # ==========================================================
 
-        super().save_model(request, obj, form, change)
-    
-    # Reviewer can only view reports
-    def has_change_permission(self, request, obj=None):
-
-        if request.user.role and request.user.role.role_name:
-            return False
-
-        return super().has_change_permission(request, obj)
-
-    # Reviewer cannot delete reports
-    def has_delete_permission(self, request, obj=None):
-
-        if request.user.role and request.user.role.role_name:
-            return False
-
-        return super().has_delete_permission(request, obj)
-    
-    # Reviewer cannot create reports
     def has_add_permission(self, request):
 
-        if request.user.role and request.user.role.role_name:
+        if request.user.is_reviewer:
             return False
 
         return super().has_add_permission(request)
 
 
- 
-    #Reviewer can only view records.
+    def has_change_permission(self, request, obj=None):
+
+        if request.user.is_reviewer:
+            return False
+
+        return super().has_change_permission(request, obj)
+
+
+    def has_delete_permission(self, request, obj=None):
+
+        if request.user.is_reviewer:
+            return False
+
+        return super().has_delete_permission(request, obj)
     
+
+# ==========================================================
+# Read Only Admin Models
+# ==========================================================
+
 @admin.register(ReportStatus)
 class ReportStatusAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "status_name",
+    )
+
+    search_fields = (
+        "status_name",
+    )
 
 
 @admin.register(Severity)
 class SeverityAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "severity_name",
+    )
+
+    search_fields = (
+        "severity_name",
+    )
 
 
 @admin.register(Outcome)
 class OutcomeAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "outcome_name",
+    )
+
+    search_fields = (
+        "outcome_name",
+    )
 
 
 @admin.register(ReportDrug)
 class ReportDrugAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "report",
+        "drug",
+        "drug_type",
+        "dose",
+    )
+
+    search_fields = (
+        "report__registration_number",
+        "drug__generic_name",
+    )
 
 
 @admin.register(AdverseReaction)
 class AdverseReactionAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "report",
+        "severity",
+        "outcome",
+    )
 
 
 @admin.register(LaboratoryInvestigation)
 class LaboratoryInvestigationAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "reaction",
+        "investigation_type",
+        "investigation_date",
+    )
 
 
 @admin.register(Attachment)
 class AttachmentAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "report",
+        "uploaded_at",
+    )
 
 
 @admin.register(Review)
 class ReviewAdmin(ReadOnlyAdmin):
-    pass
 
-
-@admin.register(AuditLog)
-class AuditLogAdmin(ReadOnlyAdmin):
-    pass
+    list_display = (
+        "report",
+        "reviewer",
+        "decision",
+        "review_date",
+    )
 
 
 @admin.register(Notification)
 class NotificationAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "report",
+        "reporter",
+        "notification_type",
+        "delivery_status",
+    )
 
 
 @admin.register(StatusHistory)
 class StatusHistoryAdmin(ReadOnlyAdmin):
-    pass
+
+    list_display = (
+        "report",
+        "old_status",
+        "new_status",
+        "changed_by",
+        "changed_at",
+    )
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(ReadOnlyAdmin):
+
+    list_display = (
+        "user",
+        "action",
+        "table_name",
+        "record_id",
+        "action_date",
+    )
+
+    search_fields = (
+        "action",
+        "table_name",
+    )
