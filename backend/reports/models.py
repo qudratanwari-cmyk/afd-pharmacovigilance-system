@@ -101,6 +101,7 @@ class Report(models.Model):
 
     updated_at=models.DateTimeField(auto_now=True)
 
+    
     # Automatically generate registration number and assign Pending status
     def save(self, *args, **kwargs):
 
@@ -141,6 +142,42 @@ class Report(models.Model):
 
         # Get current status name
         status_name = self.status.status_name.lower()
+
+                # ==========================================================
+        # Validate patient information for Health Facility reports
+        # ==========================================================
+
+        reporter_code = self.reporter.reporter_type.code
+
+        if self.reporter.reporter_type.code == "HF":
+
+            if not self.patient.gender_id:
+                raise ValidationError({
+                    "patient": "Patient gender is required."
+                })
+
+            if self.patient.weight is None:
+                raise ValidationError({
+                    "patient": "Patient weight is required."
+                })
+
+            if self.patient.height is None:
+                raise ValidationError({
+                    "patient": "Patient height is required."
+                })
+
+            # Pregnancy and breastfeeding are required only for female patients
+            if self.patient.gender.gender_name.lower() == "female":
+
+                if self.patient.is_pregnant is None:
+                    raise ValidationError({
+                        "patient": "Pregnancy status is required."
+                    })
+
+                if self.patient.is_breast_feeding is None:
+                    raise ValidationError({
+                        "patient": "Breastfeeding status is required."
+                    })
 
         # Approved reports must have approver and approval date
         if status_name == "approved":

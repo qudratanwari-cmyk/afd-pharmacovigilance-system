@@ -6,9 +6,9 @@ from .models import ReporterType, HealthFacility, Reporter
 @admin.register(ReporterType)
 class ReporterTypeAdmin(admin.ModelAdmin):
 
-    list_display = ("id", "reporter_type_name")
+    list_display = ("id", "reporter_type")
 
-    search_fields = ("reporter_type_name",)
+    search_fields = ("reporter_type",)
 
 
 @admin.register(HealthFacility)

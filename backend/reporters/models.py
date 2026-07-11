@@ -4,13 +4,22 @@ from common.models import Province
 
 
 class ReporterType(models.Model):
-    reporter_type_name = models.CharField(max_length=100, unique=True)
+
+    # Internal code used by business rules
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        null=True
+    )
+
+    reporter_type = models.CharField(max_length=100, unique=True)
 
     class Meta:
         db_table = "reporter_types"
 
     def __str__(self):
-        return self.reporter_type_name
+        return self.reporter_type
 
 
 class HealthFacility(models.Model):

@@ -6,12 +6,6 @@ from reporters.models import HealthFacility
 
 class Patient(models.Model):
 
-    health_facility = models.ForeignKey(
-        HealthFacility,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
 
     province = models.ForeignKey(
         Province,
