@@ -216,6 +216,68 @@ class ReportAdmin(admin.ModelAdmin):
                 changed_by=request.user,
             )
 
+        # ==========================================================
+        # Automatically create notification
+        # ==========================================================
+
+        if change and previous_status != obj.status:
+
+            if obj.status.code == "APR":
+
+                Notification.objects.create(
+
+                    report=obj,
+
+                    reporter=obj.reporter,
+
+                    notification_type="SYSTEM",
+
+                    subject="Report Approved",
+
+                    message=(
+                        f"Your report {obj.registration_number} has been approved."
+                    ),
+
+                    delivery_status="Pending",
+                )
+
+            elif obj.status.code == "REJ":
+
+                Notification.objects.create(
+
+                    report=obj,
+
+                    reporter=obj.reporter,
+
+                    notification_type="SYSTEM",
+
+                    subject="Report Rejected",
+
+                    message=(
+                        f"Your report {obj.registration_number} has been rejected."
+                    ),
+
+                    delivery_status="Pending",
+                )
+
+            elif obj.status.code == "CLS":
+
+                Notification.objects.create(
+
+                    report=obj,
+
+                    reporter=obj.reporter,
+
+                    notification_type="SYSTEM",
+
+                    subject="Report Closed",
+
+                    message=(
+                        f"Your report {obj.registration_number} has been closed."
+                    ),
+
+                    delivery_status="Pending",
+                )
         
 
         # Save audit log

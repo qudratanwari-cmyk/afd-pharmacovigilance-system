@@ -17,7 +17,15 @@ from django.utils import timezone
 
 class ReportStatus(models.Model):
 
-    status_name=models.CharField(max_length=50,unique=True)
+    # Internal code used by workflow
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        null=True
+    )
+
+    status_name=models.CharField(max_length=100,unique=True)
 
     class Meta:
         db_table="report_statuses"
@@ -27,6 +35,14 @@ class ReportStatus(models.Model):
 
 
 class Severity(models.Model):
+
+    # Internal severity code
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        null=True
+    )
 
     severity_name=models.CharField(max_length=100,unique=True)
 
@@ -38,6 +54,14 @@ class Severity(models.Model):
 
 
 class Outcome(models.Model):
+
+    # Internal severity code
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        null=True
+    )
 
     outcome_name=models.CharField(max_length=100,unique=True)
 
@@ -132,6 +156,19 @@ class Report(models.Model):
                 self.registration_number = (
                     f"PV-{current_year}-{last_number:06d}"
                 )
+
+        # Automatically set approved date
+        if self.status.code == "APR" and not self.approved_date:
+            print(self.status.code)
+
+            self.approved_date = timezone.now().date()
+        
+
+        # Automatically set closed date
+        if self.status.code == "CLS" and not self.closed_date:
+
+            self.closed_date = timezone.now().date()
+   
         # Run model validation before saving
         self.full_clean()
 
@@ -140,10 +177,52 @@ class Report(models.Model):
     # Validate report business rules
     def clean(self):
 
+
+        super().clean()
+
+        # Skip validation for new reports
+        if not self.pk:
+            return
+
+        # Get previous status from database
+        previous = Report.objects.get(pk=self.pk)
+
+        old_status = previous.status.code
+        new_status = self.status.code
+
+        # Allowed workflow transitions
+        allowed_transitions = {
+
+            "PEN": ["REV"],
+
+            "REV": ["APR", "REJ"],
+
+            "APR": ["CLS"],
+
+            "CLS": ["ARC"],
+
+            "REJ": [],
+
+            "ARC": [],
+        }
+
+        # Validate workflow transition
+        if new_status != old_status:
+
+            if new_status not in allowed_transitions.get(old_status, []):
+
+                raise ValidationError(
+                    {
+                        "status":
+                        f"Invalid status transition: "
+                        f"{old_status} → {new_status}"
+                    }
+                )
+
         # Get current status name
         status_name = self.status.status_name.lower()
 
-                # ==========================================================
+        # ==========================================================
         # Validate patient information for Health Facility reports
         # ==========================================================
 
@@ -167,7 +246,7 @@ class Report(models.Model):
                 })
 
             # Pregnancy and breastfeeding are required only for female patients
-            if self.patient.gender.gender_name.lower() == "female":
+            if self.patient.gender.code.lower() == "female":
 
                 if self.patient.is_pregnant is None:
                     raise ValidationError({
@@ -213,6 +292,33 @@ class Report(models.Model):
                 raise ValidationError({
                     "approved_date": "Approved Date cannot be earlier than Report Date."
                 })
+        # ==========================================================
+        # Lock approved reports
+        # ==========================================================
+
+        if self.pk:
+
+            previous = Report.objects.get(pk=self.pk)
+
+            if previous.status.code == "APR":
+
+                protected_fields = [
+
+                    "reporter_id",
+                    "patient_id",
+                    "report_date",
+
+                ]
+
+                for field in protected_fields:
+
+                    if getattr(previous, field) != getattr(self, field):
+
+                        raise ValidationError(
+
+                            "Approved reports cannot be modified."
+
+                        )
     class Meta:
         db_table="reports"
 

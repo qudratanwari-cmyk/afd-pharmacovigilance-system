@@ -82,12 +82,6 @@ class Reporter(models.Model):
 
     address = models.TextField(blank=True)
 
-    stamp_image = models.ImageField(
-        upload_to="stamps/",
-        blank=True,
-        null=True
-    )
-
     registration_date = models.DateField()
 
     class Meta:
