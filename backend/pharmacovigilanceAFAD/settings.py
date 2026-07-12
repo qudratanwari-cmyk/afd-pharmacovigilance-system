@@ -85,7 +85,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'pharmacovigilance_db',
         'USER': 'postgres',
-        'PASSWORD': '0744705670',   # رمز خودت
+        'PASSWORD': 'admin@123',   # رمز خودت
         'HOST': 'localhost',
         'PORT': '5432',
     }

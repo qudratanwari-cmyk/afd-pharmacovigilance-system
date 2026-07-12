@@ -8,7 +8,6 @@ class ReporterType(models.Model):
     # Internal code used by business rules
     code = models.CharField(
         max_length=20,
-        unique=True,
         blank=True,
         null=True
     )
@@ -63,10 +62,6 @@ class Reporter(models.Model):
 
     full_name = models.CharField(max_length=150)
 
-    organization_name = models.CharField(
-        max_length=200,
-        blank=True
-    )
 
     job_title = models.CharField(
         max_length=150,

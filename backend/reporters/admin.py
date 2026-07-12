@@ -38,7 +38,6 @@ class ReporterAdmin(admin.ModelAdmin):
     list_display = (
         "full_name",
         "reporter_type",
-        "organization_name",
         "phone_number",
        
     )
@@ -51,5 +50,4 @@ class ReporterAdmin(admin.ModelAdmin):
     search_fields = (
         "full_name",
         "phone_number",
-        "organization_name",
     )
