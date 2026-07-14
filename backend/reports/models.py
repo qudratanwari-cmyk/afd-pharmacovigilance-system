@@ -4,15 +4,11 @@ from reporters.models import Reporter
 from patients.models import Patient
 from drugs.models import Drug, DrugType
 from django.db import models
-
 from django.core.exceptions import ValidationError
-
 # Generate current year
 from datetime import datetime
-
 # Database transaction support
 from django.db import transaction
-
 from django.utils import timezone
 
 class ReportStatus(models.Model):
@@ -292,33 +288,40 @@ class Report(models.Model):
                 raise ValidationError({
                     "approved_date": "Approved Date cannot be earlier than Report Date."
                 })
+            
         # ==========================================================
-        # Lock approved reports
+        # Lock Approved / Closed / Archived Report
         # ==========================================================
 
         if self.pk:
 
             previous = Report.objects.get(pk=self.pk)
 
-            if previous.status.code == "APR":
+            if previous.status.code in ["APR", "CLS", "ARC"]:
 
                 protected_fields = [
 
-                    "reporter_id",
-                    "patient_id",
+                    "reporter",
+                    "patient",
                     "report_date",
 
+                    "approved_by",
+                    "approved_date",
+
+                    "reject_reason",
+                    "archive_reason",
                 ]
 
                 for field in protected_fields:
 
                     if getattr(previous, field) != getattr(self, field):
 
-                        raise ValidationError(
+                        raise ValidationError({
 
-                            "Approved reports cannot be modified."
+                            field:
+                            "This report has already been approved and cannot be modified."
 
-                        )
+                        })
     class Meta:
         db_table="reports"
 
@@ -362,6 +365,15 @@ class ReportDrug(models.Model):
 
     # Validate treatment dates
     def clean(self):
+        super().clean()
+
+        if self.report.status.code in ["APR", "CLS", "ARC"]:
+
+            raise ValidationError(
+
+                "Cannot modify drugs of an Approved, Closed or Archived report."
+
+            )
 
         # Stop date cannot be earlier than start date
         if self.treatment_start_date and self.treatment_stop_date:
@@ -416,6 +428,15 @@ class AdverseReaction(models.Model):
 
     # Validate adverse reaction dates
     def clean(self):
+        super().clean()
+
+        if self.report.status.code in ["APR", "CLS", "ARC"]:
+
+            raise ValidationError(
+
+                "Cannot modify adverse reactions of an Approved, Closed or Archived report."
+
+            )
 
         # End date cannot be earlier than start date
         if self.reaction_start_date and self.reaction_end_date:
@@ -449,6 +470,18 @@ class LaboratoryInvestigation(models.Model):
 
     investigation_date=models.DateField(null=True,blank=True)
 
+    def clean(self):
+
+            super().clean()
+
+            if self.reaction.report.status.code in ["APR", "CLS", "ARC"]:
+
+                raise ValidationError(
+
+                    "Cannot modify laboratory investigations of an Approved, Closed or Archived report."
+
+                )
+
     class Meta:
         db_table="laboratory_investigations"
 
@@ -461,6 +494,24 @@ class Attachment(models.Model):
     description=models.TextField(blank=True)
 
     uploaded_at=models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+
+        super().clean()
+
+        if self.report.status.code in ["APR", "CLS", "ARC"]:
+
+            raise ValidationError(
+
+                "Cannot modify attachments of an Approved, Closed or Archived report."
+
+            )
+    
+    def save(self, *args, **kwargs):
+
+        self.full_clean()
+
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table="attachments"
